@@ -1,4 +1,7 @@
 
+let md5 = require('md5');
+let fs = require('fs');
+
 let useDb = (callback) => {
     let sqlite3 = require('sqlite3');
     let db = new sqlite3.Database('./zhopa.db');
@@ -63,6 +66,17 @@ let deletePost = (post, tokenInfo) => new Promise((resolve, reject) => {
     });
 });
 
+let emailToMatchmaking = new Map();
+let enterMatchmaking = (rqData, tokenInfo) => {
+    let email = tokenInfo.email;
+    emailToMatchmaking.set(email, {enteredAt: process.hrtime()});
+    let activePlayers = [...emailToMatchmaking]
+        .filter(([email, data]) => process.hrtime()[0] - data.enteredAt[0] < 30)
+        .map(([email, data]) => 1 && {email: email, enteredAt: data.enteredAt});
+    return {activePlayers};
+};
+
+
 let getPosts = (requestData) => new Promise((resolve, reject) => {
     useDb(db => fetchAll(db, 'posts', []).then(resolve).catch(reject));
 });
@@ -79,6 +93,42 @@ let getUserData = (googleIdToken) => new Promise((resolve, reject) => {
         } else {
             resolve(tokenInfo);
         }
+    });
+});
+
+let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
+    let {fileName = '', imageBase64} = rqData;
+    if (!imageBase64) {
+        return reject('File is empty');
+    }
+    let maxSize = 1024 * 1024; // a mebibyte
+    let fileSize = imageBase64.length / 4 * 3;
+    if (fileSize > 1024 * 1024) {
+        return reject('File size, ' + (fileSize / 1024) + ' KiB, exceeds max allowed size, ' + maxSize + ' KiB');
+    }
+    let popular = ['bmp', 'gif', 'ico', 'jpeg', 'jpg', 'pic', 'tga', 'tif', 'tiff', 'psd', 'xcf', 'svg', 'png'];
+    let buf = Buffer.from(imageBase64, 'base64');
+    let imgMd5 = md5(buf);
+    let fileExt = '';
+    for (let ext of popular) {
+        if (fileName.endsWith('.' + ext)) {
+            fileExt = '.' + ext;
+        }
+    }
+    let dirName = new Date().toISOString().slice(0, 10);
+    let email = tokenInfo.email.replace(/\//g, ''); // just in case
+    let urlPath = '/unv/hosted/' + dirName + '/' + email + '@' + imgMd5 + fileExt;
+    let fsPath = '/var/www/html' + urlPath;
+    let dirPath = fsPath.replace(/^(.*)\/.*$/, '$1');
+    fs.promises.mkdir(dirPath, {recursive: true, mode: 0o777}).finally(() => {
+        let wstream = fs.createWriteStream(fsPath, {mode: 0o777});
+        wstream.write(buf);
+        wstream.end();
+        wstream.on('finish', (...args) => resolve({
+            imageUrl: 'https://midiana.lv' + urlPath,
+            args: args,
+        }));
+        wstream.on('error', (error) => reject(error));
     });
 });
 
@@ -100,8 +150,13 @@ exports.processRequest = (requestData) => {
     } else if (func === 'deletePost') {
         return getUserData(requestData.googleIdToken)
             .then(tokenInfo => deletePost(requestData, tokenInfo));
+    } else if (func === 'uploadImage') {
+        return getUserData(requestData.googleIdToken)
+            .then(tokenInfo => uploadImage(requestData, tokenInfo));
+    } else if (func === 'enterMatchmaking') {
+        return getUserData(requestData.googleIdToken)
+            .then(tokenInfo => enterMatchmaking(requestData, tokenInfo));
     } else if (func === 'login') {
-        console.log(requestData);
         let googleIdToken = requestData.googleUser.Zi.id_token;
         return login(googleIdToken);
     } else {
