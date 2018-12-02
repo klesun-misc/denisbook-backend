@@ -1,6 +1,7 @@
 
 let md5 = require('md5');
 let fs = require('fs');
+let RpsImba = require('./Controllers/RpsImba.js');
 
 let useDb = (callback) => {
     let sqlite3 = require('sqlite3');
@@ -65,17 +66,6 @@ let deletePost = (post, tokenInfo) => new Promise((resolve, reject) => {
         }).then(resolve).catch(reject);
     });
 });
-
-let emailToMatchmaking = new Map();
-let enterMatchmaking = (rqData, tokenInfo) => {
-    let email = tokenInfo.email;
-    emailToMatchmaking.set(email, {enteredAt: process.hrtime()});
-    let activePlayers = [...emailToMatchmaking]
-        .filter(([email, data]) => process.hrtime()[0] - data.enteredAt[0] < 30)
-        .map(([email, data]) => 1 && {email: email, enteredAt: data.enteredAt});
-    return {activePlayers};
-};
-
 
 let getPosts = (requestData) => new Promise((resolve, reject) => {
     useDb(db => fetchAll(db, 'posts', []).then(resolve).catch(reject));
@@ -142,23 +132,24 @@ let login = (googleIdToken) => getUserData(googleIdToken)
 
 exports.processRequest = (requestData) => {
     let func = requestData.func;
-    if (func === 'getRelevantPosts') {
-        return getPosts(requestData).then(posts => 1 && {records: posts || null});
-    } else if (func === 'addPost') {
+    let handlers = {
+        getRelevantPosts: () => getPosts(requestData)
+            .then(posts => 1 && {records: posts || null}),
+        login: () => login(requestData.googleUser.Zi.id_token),
+    };
+    let authHandlers = {
+        addPost             : (auth) => addPost(requestData, auth),
+        deletePost          : (auth) => deletePost(requestData, auth),
+        uploadImage         : (auth) => uploadImage(requestData, auth),
+        syncMatchmaking     : (auth) => RpsImba(auth).syncMatchmaking(requestData),
+        challenge           : (auth) => RpsImba(auth).challenge(requestData),
+        makeMove            : (auth) => RpsImba(auth).makeMove(requestData),
+    };
+    if (handlers[func]) {
+        return handlers[func]();
+    } else if (authHandlers[func]) {
         return getUserData(requestData.googleIdToken)
-            .then(tokenInfo => addPost(requestData, tokenInfo));
-    } else if (func === 'deletePost') {
-        return getUserData(requestData.googleIdToken)
-            .then(tokenInfo => deletePost(requestData, tokenInfo));
-    } else if (func === 'uploadImage') {
-        return getUserData(requestData.googleIdToken)
-            .then(tokenInfo => uploadImage(requestData, tokenInfo));
-    } else if (func === 'enterMatchmaking') {
-        return getUserData(requestData.googleIdToken)
-            .then(tokenInfo => enterMatchmaking(requestData, tokenInfo));
-    } else if (func === 'login') {
-        let googleIdToken = requestData.googleUser.Zi.id_token;
-        return login(googleIdToken);
+            .then(auth => authHandlers[func](auth));
     } else {
         return Promise.reject('Unknown func - ' + func);
     }
