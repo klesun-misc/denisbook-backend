@@ -4,19 +4,18 @@ let fs = require('fs');
 let RpsImba = require('./Controllers/RpsImba.js');
 let Db = require('./Utils/Db.js');
 
-let addPost = (post, tokenInfo) => new Promise((resolve, reject) => {
-    Db.useDb(db => {
-        let stmt = db.prepare('INSERT INTO posts VALUES (?,?,?,?);');
-        stmt.run(post.text, tokenInfo.email, new Date().toISOString(), post.title, function(err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve({message: 'Written OK', rowId: this.lastID || null, author: tokenInfo.email});
-            }
-            stmt.finalize();
-        });
-    });
-});
+let addPost = (post, tokenInfo) =>
+    Db.useDb(db => db.insert('posts', [{
+        text: post.text,
+        author: tokenInfo.email,
+        dt: new Date().toISOString(),
+        title: post.title,
+    }]).then(meta => ({
+        message: 'Written OK',
+        rowId: meta.rowId,
+        author: tokenInfo.email,
+    })));
+
 
 let deletePost = (post, tokenInfo) => new Promise((resolve, reject) => {
     Db.useDb(db => {

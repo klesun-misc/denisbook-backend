@@ -1,4 +1,6 @@
 
+let Db = require('../Utils/Db.js');
+
 let emailToPlayer = new Map();
 let challengedToChallenger = new Map();
 
@@ -25,7 +27,10 @@ module.exports = (auth) => {
         emailToPlayer.set(actor, {activityTs: new Date().getTime()});
         let activePlayers = [...emailToPlayer]
             .filter(([email, data]) => new Date().getTime() - data.activityTs < 30 * 1000)
-            .map(([email, data]) => ({email: email, activityTs: data.activityTs}));
+            .map(([email, data]) => ({
+                email: email,
+                activityTs:  data.activityTs,
+            }));
         let challenged = activePlayers.map(a => a.email)
             .filter(e => challengedToChallenger.get(e) === actor)
             [0] || null;
@@ -91,6 +96,26 @@ module.exports = (auth) => {
 
     let deepCopy = val => JSON.parse(JSON.stringify(val));
 
+    let storeMatchInDb = match =>
+        Db.useDb(db => {
+            let winner = match.players.filter(p => p.points >= 3)[0].email;
+            let looser = match.players.filter(p => p.points < 3)[0].email;
+            return db.insert('rpsImbaMatches', [{
+                winner: winner,
+                looser: looser,
+                dt: new Date().toISOString(),
+            }]) .then(({rowId}) => rowId ? rowId :
+                    Promise.reject('last insert id of match is empty'))
+                .then(rowId => match.moveHistory.map(moveRecs =>
+                    db.insert('rpsImbaMoves', [{
+                        matchId: rowId,
+                        winnerMove: moveRecs.filter(p => p.email === winner)[0].move,
+                        looserMove: moveRecs.filter(p => p.email === looser)[0].move,
+                    }])
+                ))
+                .then(movePromises => Promise.all(movePromises));
+        }).catch(exc => console.error('Failed to store RPS match to DB', exc));
+
     let makeMove = (rqData) => {
         let move = rqData.move;
         let match = matches.filter(m => m.players
@@ -100,16 +125,17 @@ module.exports = (auth) => {
         let opponent = match.players.filter(p => p.email !== actor)[0];
         you.move = move;
         if (opponent.move) {
+            match.moveHistory.push(deepCopy(match.players));
             let sign = compareMoves(you.move, opponent.move);
             if (sign > 0) {
                 you.points += prizePoints[you.move];
             } else if (sign < 0) {
                 opponent.points += prizePoints[opponent.move];
             }
-            match.moveHistory.push(deepCopy(match.players));
             match.players.forEach(p => p.move = null);
             let gameOver = match.players.some(p => p.points >= 3);
             if (gameOver) {
+                storeMatchInDb(match);
                 challengedToChallenger.delete(actor);
                 challengedToChallenger.delete(opponent.email);
             }
