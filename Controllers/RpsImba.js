@@ -22,25 +22,44 @@ module.exports = (auth) => {
         moveHistory: match.moveHistory,
     });
 
+    let getWinRate = (db, email) =>
+        db.all([
+            'SELECT COUNT(*) AS cnt FROM rpsImbaMatches',
+            'WHERE winner = ' + JSON.stringify(email),
+        ].join('\n')).then(winRows => db.all([
+            'SELECT COUNT(*) AS cnt FROM rpsImbaMatches',
+            'WHERE looser = ' + JSON.stringify(email),
+        ].join('\n')).then(loseRows => ({
+            wins: winRows.length > 0 ? winRows[0].cnt : 0,
+            loses: loseRows.length > 0 ? loseRows[0].cnt : 0,
+        })));
+
     let syncMatchmaking = (rqData) => {
         let challengedBy = challengedToChallenger.get(actor);
         emailToPlayer.set(actor, {activityTs: new Date().getTime()});
-        let activePlayers = [...emailToPlayer]
-            .filter(([email, data]) => new Date().getTime() - data.activityTs < 30 * 1000)
-            .map(([email, data]) => ({
-                email: email,
-                activityTs:  data.activityTs,
-            }));
-        let challenged = activePlayers.map(a => a.email)
-            .filter(e => challengedToChallenger.get(e) === actor)
-            [0] || null;
-        let match = matches
-            .filter(m => m.players
-                .some(p => p.email === actor))[0];
-        return {
-            activePlayers, challengedBy, challenged,
-            match: !match ? null : maskOpponentChoice(match),
-        };
+        let whenActivePlayers = Db.useDb(db =>
+            [...emailToPlayer]
+                .filter(([email, data]) => new Date().getTime() - data.activityTs < 30 * 1000)
+                .map(([email, data]) =>
+                    getWinRate(db, email).then(({wins, loses}) => ({
+                        wins, loses, email, activityTs: data.activityTs,
+                    }))
+                )
+        ).then(promises => Promise.all(promises));
+
+        return whenActivePlayers.then(activePlayers => {
+            let challenged = activePlayers.map(a => a.email)
+                .filter(e => challengedToChallenger.get(e) === actor)
+                [0] || null;
+            let match = matches
+                .filter(m => m.players
+                    .some(p => p.email === actor))[0];
+            return {
+                zhopa: activePlayers[0].constructor.name,
+                activePlayers, challengedBy, challenged,
+                match: !match ? null : maskOpponentChoice(match),
+            };
+        });
     };
 
     let challenge = (rqData) => {

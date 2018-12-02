@@ -9,7 +9,17 @@ let useDb = (callback) => {
         .finally(() => db.close());
 };
 
-let fetchAll = (db, table, keyFields = []) => new Promise((resolve, reject) => {
+let all = (db, sql) => new Promise((resolve, reject) => {
+    db.all(sql, (err, rows) => {
+        if (err) {
+            reject(err);
+        } else {
+            resolve(rows);
+        }
+    });
+});
+
+let fetchAll = (db, table, keyFields = []) => {
     let quote = value => value === undefined ? 'null' : JSON.stringify(value);
     let sql = [
         `SELECT *, ROWID as rowId FROM ${table}`,
@@ -19,14 +29,8 @@ let fetchAll = (db, table, keyFields = []) => new Promise((resolve, reject) => {
     }).join(' ')).concat([
         `ORDER BY ROWID DESC;`,
     ]).join('\n');
-    db.all(sql, (err, rows) => {
-        if (err) {
-            reject(err);
-        } else {
-            resolve(rows);
-        }
-    });
-});
+    return all(db, sql);
+};
 
 let fetchOne = (db, table, keyFields = []) => fetchAll(db, table, keyFields)
     .then(rows => rows.length > 0
@@ -77,6 +81,8 @@ let Db = (db) => {
         insert: insert,
         fetchAll: (table, keyFields = []) => fetchAll(db, table, keyFields),
         fetchOne: (table, keyFields = []) => fetchOne(db, table, keyFields),
+        // for complex SQL-s with JOIN-s and stuff
+        all: (sql) => all(db, sql),
         // TODO: replace with generic SQL generation functions
         prepare: (...args) => db.prepare(...args),
     };
