@@ -89,31 +89,55 @@ let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
     });
 });
 
-let login = (googleIdToken) => getUserData(googleIdToken)
-    .then(tokenInfo => useDb(db => {
-        let stmt = db.prepare('REPLACE INTO users (email, displayName, imageUrl) VALUES (?,?,?);');
-        stmt.run(tokenInfo.email, tokenInfo.name, tokenInfo.picture);
-        stmt.finalize();
-        return {tokenInfo: tokenInfo};
-    }));
+let login = (tokenInfo) => Db.useDb(db => {
+    return db.fetchOne('users', [
+        ['email', tokenInfo.email],
+    ]).catch(exc => db.insert('users', [{
+        email: tokenInfo.email,
+        name: tokenInfo.name,
+        picture: tokenInfo.picture,
+    }]));
+});
 
 exports.processRequest = (requestData) => {
     let func = requestData.func;
     let handlers = {
         getRelevantPosts: () => getPosts(requestData)
             .then(posts => 1 && {records: posts || null}),
-        login: () => login(requestData.googleUser.Zi.id_token),
+        getPublicKey: () => {
+            let email = requestData.email;
+            // TODO: implement - store public key of each user in DB
+            return {publicKey: 'asdasdasdsasa-bfd-bdf-bfd--bdfb-fd-b-fd'};
+        },
     };
     let authHandlers = {
+        login               : (auth) => login(auth),
         addPost             : (auth) => addPost(requestData, auth),
         deletePost          : (auth) => deletePost(requestData, auth),
         uploadImage         : (auth) => uploadImage(requestData, auth),
         syncMatchmaking     : (auth) => RpsImba(auth).syncMatchmaking(requestData),
         challenge           : (auth) => RpsImba(auth).challenge(requestData),
         makeMove            : (auth) => RpsImba(auth).makeMove(requestData),
+        getUserList         : (auth) => Db.useDb(db => db.fetchAll('users')).then(rows => ({records: rows})),
+        getPrivateMessages  : (auth) => Db.useDb(db => db.fetchAll('privateMessages', [
+            ['recipient', auth.email],
+        ])).then(rows => ({records: rows, auth: auth || null})),
+        sendPrivateMessage  : (auth) => {
+            let recipient = requestData.recipient;
+            let message = requestData.message; // encrypted binary string
+            return Db.useDb(db => db.insert('privateMessages', [{
+                sender: auth.email,
+                recipient: recipient,
+                message: message,
+                encryption: requestData.encryption,
+                dt: new Date().toISOString(),
+                publicKey: requestData.publicKey,
+            }]))
+        },
     };
     if (handlers[func]) {
-        return handlers[func]();
+        return Promise.resolve()
+            .then(() => handlers[func]());
     } else if (authHandlers[func]) {
         return getUserData(requestData.googleIdToken)
             .then(auth => authHandlers[func](auth));
