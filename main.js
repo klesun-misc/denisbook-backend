@@ -94,8 +94,8 @@ let login = (tokenInfo) => Db.useDb(db => {
         ['email', tokenInfo.email],
     ]).catch(exc => db.insert('users', [{
         email: tokenInfo.email,
-        name: tokenInfo.name,
-        picture: tokenInfo.picture,
+        displayName: tokenInfo.name,
+        imageUrl: tokenInfo.picture,
     }]));
 });
 

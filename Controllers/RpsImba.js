@@ -55,7 +55,6 @@ module.exports = (auth) => {
                 .filter(m => m.players
                     .some(p => p.email === actor))[0];
             return {
-                zhopa: activePlayers[0].constructor.name,
                 activePlayers, challengedBy, challenged,
                 match: !match ? null : maskOpponentChoice(match),
             };
