@@ -122,6 +122,7 @@ exports.processRequest = (requestData) => {
         getPrivateMessages  : (auth) => Db.useDb(db => db.fetchAll('privateMessages', [
             ['recipient', auth.email],
         ])).then(rows => ({records: rows, auth: auth || null})),
+        getUserData         : (auth) => Db.useDb(db => db.fetchOne('users', [['email', requestData.email]])),
         sendPrivateMessage  : (auth) => {
             let recipient = requestData.recipient;
             let message = requestData.message; // encrypted binary string
