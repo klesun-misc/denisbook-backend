@@ -35,7 +35,12 @@ let deletePost = (post, tokenInfo) => new Promise((resolve, reject) => {
 });
 
 let getPosts = (requestData) => new Promise((resolve, reject) => {
-    Db.useDb(db => db.fetchAll('posts', []).then(resolve).catch(reject));
+    Db.useDb(db => db.fetchAll2({
+        table: 'posts',
+        where: !requestData.beforeId ? [] :
+            [['ROWID', '<', requestData.beforeId]],
+        limit: requestData.length,
+    }).then(resolve).catch(reject));
 });
 
 let getUserData = (googleIdToken) => new Promise((resolve, reject) => {

@@ -19,15 +19,16 @@ let all = (db, sql) => new Promise((resolve, reject) => {
     });
 });
 
-let fetchAll = (db, table, keyFields = []) => {
+let fetchAll = ({db, table, where = [], limit = null}) => {
     let quote = value => value === undefined ? 'null' : JSON.stringify(value);
     let sql = [
         `SELECT *, ROWID as rowId FROM ${table}`,
         `WHERE TRUE`,
-    ].concat(keyFields.map(([name, value]) => {
-        return 'AND `' + name + '` = ' + quote(value);
+    ].concat(where.map(([name, operand, value]) => {
+        return 'AND `' + name + '` ' + operand + ' ' + quote(value);
     }).join(' ')).concat([
-        `ORDER BY ROWID DESC;`,
+        `ORDER BY ROWID DESC`,
+        limit ? `LIMIT ` + +limit : ``,
     ]).join('\n');
     return all(db, sql);
 };
@@ -79,8 +80,9 @@ let Db = (db) => {
 
     return {
         insert: insert,
-        fetchAll: (table, keyFields = []) => fetchAll(db, table, keyFields),
-        fetchOne: (table, keyFields = []) => fetchOne(db, table, keyFields),
+        fetchAll2: (params) => fetchAll({db, ...params}),
+        fetchAll: (table, keyFields = []) => fetchAll({db, table, where: keyFields.map(tup => [tup[0], '=', tup[1]])}),
+        fetchOne: (table, keyFields = []) => fetchOne({db, table, where: keyFields.map(tup => [tup[0], '=', tup[1]])}),
         // for complex SQL-s with JOIN-s and stuff
         all: (sql) => all(db, sql),
         // TODO: replace with generic SQL generation functions
