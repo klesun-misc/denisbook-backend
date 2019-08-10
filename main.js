@@ -10,6 +10,7 @@ let addPost = (post, tokenInfo) =>
         author: tokenInfo.email,
         dt: new Date().toISOString(),
         title: post.title,
+        customData: JSON.stringify( post.customData ),
     }]).then(meta => ({
         message: 'Written OK',
         rowId: meta.rowId,
@@ -57,7 +58,9 @@ let getPosts = (requestData) => new Promise((resolve, reject) => {
         where: !requestData.beforeId ? [] :
             [['ROWID', '<', requestData.beforeId]],
         limit: requestData.length,
-    }).then(resolve).catch(reject));
+    }).then( rows => {
+        resolve(rows.map( row => ({...row, customData: row.customData ? JSON.parse(row.customData) : null}) ));
+    } ).catch(reject));
 });
 
 const getLikes = requestData => new Promise( (res, rej) => {

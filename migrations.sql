@@ -30,3 +30,4 @@ looserMove VARCHAR(15)
 );
 CREATE INDEX matcId_winnerMove on rpsImbaMoves (matchId, winnerMove);
 CREATE INDEX matcId_looserMove on rpsImbaMoves (matchId, looserMove);
+ALTER TABLE posts ADD COLUMN customData TEXT DEFAULT NULL;
