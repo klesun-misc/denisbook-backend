@@ -10,12 +10,30 @@ let addPost = (post, tokenInfo) =>
         author: tokenInfo.email,
         dt: new Date().toISOString(),
         title: post.title,
+        customData: JSON.stringify( post.customData ),
     }]).then(meta => ({
         message: 'Written OK',
         rowId: meta.rowId,
         author: tokenInfo.email,
     })));
 
+let likePost = (post, tokenInfo) =>
+    Db.useDb(db => db.insert('likes', [{
+        postId: post.postId,
+        author: tokenInfo.email,
+        dt: new Date().toISOString(),
+    }]).then(meta => ({
+        message: 'Written OK',
+        rowId: meta.rowId,
+        author: tokenInfo.email,
+    })));
+
+let unlikePost = (post, tokenInfo) => Db.useDb(db => {
+    let stmt = db.prepare('DELETE FROM likes WHERE postId = ? AND author = ?');
+    let sqlStatus = stmt.run(post.postId, tokenInfo.email);
+    stmt.finalize();
+    return {message: 'Success', sqlStatus: sqlStatus};
+});
 
 let deletePost = (post, tokenInfo) => new Promise((resolve, reject) => {
     Db.useDb(db => {
@@ -40,8 +58,16 @@ let getPosts = (requestData) => new Promise((resolve, reject) => {
         where: !requestData.beforeId ? [] :
             [['ROWID', '<', requestData.beforeId]],
         limit: requestData.length,
-    }).then(resolve).catch(reject));
+    }).then( rows => {
+        resolve(rows.map( row => ({...row, customData: row.customData ? JSON.parse(row.customData) : null}) ));
+    } ).catch(reject));
 });
+
+const getLikes = requestData => new Promise( (res, rej) => {
+    Db.useDb( db => db.fetchAll2({
+        table: 'likes'
+    }).then(res).catch(rej) );
+} ) ;
 
 let getUserData = (googleIdToken) => new Promise((resolve, reject) => {
     if (!googleIdToken) {
@@ -109,6 +135,8 @@ exports.processRequest = (requestData) => {
     let handlers = {
         getRelevantPosts: () => getPosts(requestData)
             .then(posts => 1 && {records: posts || null}),
+        getPostsLikes : () => getLikes(requestData)
+            .then( likes => 1 && {postsLikes: likes || null} ),
         getPublicKey: () => {
             let email = requestData.email;
             // TODO: implement - store public key of each user in DB
@@ -118,6 +146,8 @@ exports.processRequest = (requestData) => {
     let authHandlers = {
         login               : (auth) => login(auth),
         addPost             : (auth) => addPost(requestData, auth),
+        likePost            : (auth) => likePost(requestData, auth),
+        unlikePost          : (auth) => unlikePost(requestData, auth),
         deletePost          : (auth) => deletePost(requestData, auth),
         uploadImage         : (auth) => uploadImage(requestData, auth),
         syncMatchmaking     : (auth) => RpsImba(auth).syncMatchmaking(requestData),
