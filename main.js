@@ -113,7 +113,7 @@ let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
         wstream.write(buf);
         wstream.end();
         wstream.on('finish', (...args) => resolve({
-            imageUrl: 'https://midiana.lv' + urlPath,
+            imageUrl: 'https://klesun-productions.com' + urlPath,
             args: args,
         }));
         wstream.on('error', (error) => reject(error));
