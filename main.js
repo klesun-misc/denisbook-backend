@@ -106,7 +106,7 @@ let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
     let dirName = new Date().toISOString().slice(0, 10);
     let email = tokenInfo.email.replace(/\//g, ''); // just in case
     let urlPath = '/unv/hosted/' + dirName + '/' + email + '@' + imgMd5 + fileExt;
-    let fsPath = '/var/www/html' + urlPath;
+    let fsPath = '/mnt/servak-big-data/gits/klesun-productions.com' + urlPath;
     let dirPath = fsPath.replace(/^(.*)\/.*$/, '$1');
     fs.promises.mkdir(dirPath, {recursive: true, mode: 0o777}).finally(() => {
         let wstream = fs.createWriteStream(fsPath, {mode: 0o777});
