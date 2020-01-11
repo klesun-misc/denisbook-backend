@@ -1,7 +1,8 @@
-let http = require('http');
-var querystring = require('querystring');
+const https = require('https');
+const querystring = require('querystring');
+const fs = require('fs').promises;
 
-let server = http.createServer((req, res) => {
+const handleRq = (req, res) => {
     let main = require('./main.js');
     let postStr = '';
     req.on('data', (data) => {
@@ -38,12 +39,25 @@ let server = http.createServer((req, res) => {
                 res.statusCode = 200;
                 res.end(JSON.stringify(Object.assign({message: 'ok'}, responseData)));
             }).catch(error => {
-                res.statusCode = req.method === 'OPTIONS' ? 200 : 500; // preflight OPTIONS request, damn it
-                res.end(JSON.stringify({error: error + '', errorClass: error.constructor.name, stack: error.stack || null}));
-            });
+            res.statusCode = req.method === 'OPTIONS' ? 200 : 500; // preflight OPTIONS request, damn it
+            res.end(JSON.stringify({error: error + '', errorClass: error.constructor.name, stack: error.stack || null}));
+        });
     });
-});
+};
 
-server.listen(8080, '0.0.0.0', () => {
-    console.log(`Server running`);
+const main = async () => {
+    const server = https.createServer({
+        key: await fs.readFile('/etc/letsencrypt/archive/klesun-productions.com/privkey1.pem'),
+        cert: await fs.readFile('/etc/letsencrypt/archive/klesun-productions.com/cert1.pem'),
+    }, handleRq);
+
+    const PORT = 8086;
+    server.listen(PORT, '0.0.0.0', () => {
+        console.log(`denisbook backend server listening on ` + PORT);
+    });
+};
+
+main().catch(exc => {
+    console.error('Failed to start denisbook backend server', exc);
+    process.exit(1);
 });

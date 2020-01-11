@@ -3,7 +3,7 @@
 let useDb = (callback) => {
     let sqlite3 = require('sqlite3');
     // seems to be from project root, not from current file
-    let db = new sqlite3.Database('./zhopa.db');
+    let db = new sqlite3.Database(__dirname + '/../zhopa.db');
     return Promise.resolve()
         .then(() => callback(db))
         .finally(() => db.close());
