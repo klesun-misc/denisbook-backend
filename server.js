@@ -7,7 +7,7 @@ const handleRq = (req, res) => {
     let postStr = '';
     req.on('data', (data) => {
         postStr += data;
-        if (postStr.length > 2 * 1024 * 1024) {
+        if (postStr.length > 20 * 1024 * 1024) {
             req.connection.destroy();
         }
     });

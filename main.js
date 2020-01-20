@@ -85,13 +85,26 @@ let getUserData = (googleIdToken) => new Promise((resolve, reject) => {
 });
 
 let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
+    let email = tokenInfo.email.replace(/\//g, ''); // just in case
     let {fileName = '', imageBase64} = rqData;
     if (!imageBase64) {
         return reject('File is empty');
     }
     let maxSize = 1024 * 1024; // a mebibyte
+    const trustedEmails = [
+        'arturklesun@gmail.com',
+        'dogzy123@gmail.com',
+        'iljuxa1234@gmail.com',
+        'safronevev@gmail.com',
+        'vikaaa11@gmail.com',
+        'deniss.orlovs.1@gmail.com',
+        'i.gurskis@dyninno.lv',
+    ];
+    if (trustedEmails.includes(email)) {
+        maxSize *= 10;
+    }
     let fileSize = imageBase64.length / 4 * 3;
-    if (fileSize > 1024 * 1024) {
+    if (fileSize > maxSize) {
         return reject('File size, ' + (fileSize / 1024) + ' KiB, exceeds max allowed size, ' + maxSize + ' KiB');
     }
     let popular = ['bmp', 'gif', 'ico', 'jpeg', 'jpg', 'pic', 'tga', 'tif', 'tiff', 'psd', 'xcf', 'svg', 'png'];
@@ -104,7 +117,6 @@ let uploadImage = (rqData, tokenInfo) => new Promise((resolve, reject) => {
         }
     }
     let dirName = new Date().toISOString().slice(0, 10);
-    let email = tokenInfo.email.replace(/\//g, ''); // just in case
     let urlPath = '/unv/hosted/' + dirName + '/' + email + '@' + imgMd5 + fileExt;
     let fsPath = '/mnt/servak-big-data/gits/klesun-productions.com' + urlPath;
     let dirPath = fsPath.replace(/^(.*)\/.*$/, '$1');

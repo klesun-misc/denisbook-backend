@@ -1,1 +1,1 @@
-npm install --from-lock-file
+npm ci
