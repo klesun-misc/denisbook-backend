@@ -39,9 +39,9 @@ const handleRq = (req, res) => {
                 res.statusCode = 200;
                 res.end(JSON.stringify(Object.assign({message: 'ok'}, responseData)));
             }).catch(error => {
-            res.statusCode = req.method === 'OPTIONS' ? 200 : 500; // preflight OPTIONS request, damn it
-            res.end(JSON.stringify({error: error + '', errorClass: error.constructor.name, stack: error.stack || null}));
-        });
+                res.statusCode = req.method === 'OPTIONS' ? 200 : 500; // preflight OPTIONS request, damn it
+                res.end(JSON.stringify({error: error + '', errorClass: error.constructor.name, stack: error.stack || null}));
+            });
     });
 };
 
